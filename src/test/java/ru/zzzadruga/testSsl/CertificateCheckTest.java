@@ -2,12 +2,16 @@ package ru.zzzadruga.testSsl;
 
 import java.security.KeyStore;
 import java.security.KeyStoreException;
+import java.security.cert.CertificateExpiredException;
 import java.security.cert.X509Certificate;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 import static ru.zzzadruga.testSsl.TestUtils.DFLT_PSWRD;
 import static ru.zzzadruga.testSsl.TestUtils.certsCount;
+import static ru.zzzadruga.testSsl.TestUtils.hasCause;
 import static ru.zzzadruga.testSsl.Utils.loadKeyStore;
 
 public class CertificateCheckTest {
@@ -40,14 +44,35 @@ public class CertificateCheckTest {
 
         KeyStore login1Alpha = loadKeyStore("certs/login1-alpha.jks", DFLT_PSWRD);
         KeyStore login1Delta = loadKeyStore("certs/login1-delta.jks", DFLT_PSWRD);
+        KeyStore login1AlphaExpired = loadKeyStore("certs/login1-alpha-expired.jks", DFLT_PSWRD);
+        KeyStore unsigned = loadKeyStore("certs/unsigned.jks", DFLT_PSWRD);
+        KeyStore login1Sigma = loadKeyStore("certs/login1-sigma.jks", DFLT_PSWRD);
 
         assertEquals(certsCount(login1Alpha), 1);
         assertEquals(certsCount(login1Delta), 1);
+        assertEquals(certsCount(login1AlphaExpired), 1);
+        assertEquals(certsCount(unsigned), 1);
+        assertEquals(certsCount(login1Sigma), 1);
 
         assertEquals(((X509Certificate)login1Alpha.getCertificate("login1Alpha")).getIssuerDN(),
             intermediateCaAlpha.getSubjectDN());
 
+        assertEquals(((X509Certificate)login1AlphaExpired.getCertificate("login1AlphaExpired")).getIssuerDN(),
+            intermediateCaAlpha.getSubjectDN());
+
         assertEquals(((X509Certificate)login1Delta.getCertificate("login1Delta")).getIssuerDN(),
             intermediateCaDelta.getSubjectDN());
+
+        try {
+            ((X509Certificate)login1AlphaExpired.getCertificate("login1AlphaExpired")).checkValidity();
+
+            fail();
+        } catch (Exception e) {
+            assertTrue(hasCause(e, CertificateExpiredException.class));
+        }
+
+        X509Certificate cert;
+        assertEquals((cert = (X509Certificate)unsigned.getCertificate("noSign")).getIssuerDN(),
+            cert.getSubjectDN());
     }
 }

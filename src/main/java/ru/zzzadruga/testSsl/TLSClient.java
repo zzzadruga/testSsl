@@ -3,10 +3,12 @@ package ru.zzzadruga.testSsl;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.net.ConnectException;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.security.KeyStore;
 import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 import javax.net.SocketFactory;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
@@ -38,12 +40,30 @@ public class TLSClient {
 
         SocketFactory factory = ctx.getSocketFactory();
 
-        try (Socket connection = factory.createSocket(serverHost, serverPort)) {
-            ((SSLSocket) connection).setEnabledProtocols(new String[] {tlsVersion});
+        String line;
 
-            BufferedReader input = new BufferedReader(
-                new InputStreamReader(connection.getInputStream()));
-            return input.readLine();
+        int sslConnectAttempts = 3;
+
+        while (true) {
+            try (Socket connection = factory.createSocket(serverHost, serverPort)) {
+                ((SSLSocket)connection).setEnabledProtocols(new String[] {tlsVersion});
+
+                try (BufferedReader input = new BufferedReader(
+                    new InputStreamReader(connection.getInputStream()))) {
+                    line = input.readLine();
+
+                    break;
+                }
+            } catch (ConnectException e) {
+                if (--sslConnectAttempts == 0)
+                    throw e;
+                else
+                    TimeUnit.MILLISECONDS.sleep(500);
+            }
         }
+
+        TimeUnit.SECONDS.sleep(3);
+
+        return line;
     }
 }
